@@ -1,6 +1,6 @@
 rm(list = ls())
 if(!require('pacman'))install.packages('pacman')
-pacman::p_load(haven, dplyr, ggplot2, survey, pROC)
+pacman::p_load(haven, dplyr, ggplot2, survey, pROC, ranger)
 
 # Import required files for data analysis
 files <- c("BPX_J", "BPQ_J", "BMX_J", "DEMO_J", "GHB_J", "HDL_J", "HSCRP_J")
@@ -141,7 +141,8 @@ hist(target_population$mean_dbp, breaks = 30,
   main = "Distribution of Mean Diastolic Blood Pressure",
   xlab = "Mean diastolic blood pressure (mmHg)")
 
-# BP data quality assessment
+# BP data quality assessment (note is a screening definition as opposed to a 
+# verified clinical diagnosis)
 target_population <- target_population %>%
   mutate(high_bp = if_else(mean_sbp >= 140 | mean_dbp >= 90, 1L, 0L))
 
@@ -198,6 +199,7 @@ target_population %>%
     bmi_mean = mean(BMXBMI, na.rm = TRUE), bmi_sd = sd(BMXBMI, na.rm = TRUE),
     hba1c_mean = mean(LBXGH, na.rm = TRUE), hba1c_sd = sd(LBXGH, na.rm = TRUE),
     hdl_mean = mean(LBDHDD, na.rm = TRUE), hdl_sd = sd(LBDHDD, na.rm = TRUE),
+    # Median and IQR used due to significant skew
     crp_median = median(LBXHSCRP, na.rm = TRUE), crp_iqr = IQR(LBXHSCRP, na.rm = TRUE),
     sbp_mean = mean(mean_sbp), dbp_mean = mean(mean_dbp)
   )
@@ -233,7 +235,7 @@ ggplot(age_results, aes(x = age_group, y = high_bp_percent)) +
     y = "Participants with high blood pressure (%)") +
   theme_minimal()
 
-# Generate NHANES survey-design object and estimate prevalence
+# Generate NHANES survey-design object and estimate prevalence to get survey weighted stats
 nhanes_design <- svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA, 
                   weights = ~WTMEC2YR, nest = TRUE, data = target_population)
 nhanes_design
@@ -252,6 +254,7 @@ weighted_sex <- svyby(~high_bp, ~sex, nhanes_design, svymean,
                       na.rm = TRUE, vartype = "ci")
 weighted_sex
 
+# Inspect CRP skew
 target_population %>%
   summarise(
     n = sum(!is.na(LBXHSCRP)),
@@ -276,11 +279,11 @@ model_data <- target_population %>%
   mutate(decade_age = RIDAGEYR/10)
 
 model_design <- svydesign(ids = ~SDMVPSU, strata = ~SDMVSTRA, 
-                          weights = ~WTMEC2YR, decade_age = RIDAGEYR/10, 
-                          nest = TRUE, data = model_data)
+                          weights = ~WTMEC2YR, nest = TRUE, data = model_data)
 model_design
 
-# Model 1 - How well can basic characteristics identify screen-detected high BP?
+# Model 1 - How well can basic characteristics identify screen-detected high BP 
+# using using a survey-weighted logistic-type model?
 model_1 <- svyglm(high_bp ~ decade_age + sex + BMXBMI, design = model_design, 
                   family = quasibinomial())
 summary(model_1)
@@ -421,12 +424,83 @@ roc_prediction_2 <- roc(response = model_data$high_bp,
   predictor = model_data$pred_logistic_2, quiet = TRUE)
 auc(roc_prediction_2)
 
+# Find bootstrap iteration optimism
+pred_boot_1 <- predict(bootstrap_model_1, newdata = bootstrap_data, type = "response")
+pred_original_1 <- predict(bootstrap_model_1, newdata = model_data, type = "response")
 
+pred_boot_2 <- predict(bootstrap_model_2, newdata = bootstrap_data, type = "response")
+pred_original_2 <- predict(bootstrap_model_2, newdata = model_data, type = "response")
 
+auc_boot_1 <- as.numeric(auc(roc(
+  bootstrap_data$high_bp, pred_boot_1, quiet = TRUE)))
+auc_orig_1 <- as.numeric(auc(roc(
+  model_data$high_bp, pred_original_1, quiet = TRUE)))
+optimism_1 <- auc_boot_1 - auc_orig_1
+optimism_1
 
+# 500 bootstraps for model 1
+set.seed(2004)
+BS <- 500
+optimism_model_1 <- numeric(BS)
 
+  # Draw BS sample
+for (bs in 1:BS) {
+  bootstrap_values <- sample(seq_len(nrow(model_data)), size = nrow(model_data),
+    replace = TRUE)
+  bootstrap_data <- model_data[bootstrap_values, ]
+  # Fit model 1 in BS sample
+  bootstrap_model <- glm(high_bp ~ decade_age + sex + BMXBMI,
+    data = bootstrap_data, family = binomial())
+  # Predict on bootstrap sample
+  pred_boot <- predict(bootstrap_model, newdata = bootstrap_data, type = "response")
+  # Predict on original sample
+  pred_orig <- predict(bootstrap_model, newdata = model_data, type = "response")
+  # Calculate AUROC
+  auc_boot <- as.numeric(auc(roc(bootstrap_data$high_bp, pred_boot, quiet = TRUE)))
+  auc_orig <- as.numeric(auc(roc(model_data$high_bp, pred_orig, quiet = TRUE)))
+  
+  optimism_model_1[bs] <- auc_boot - auc_orig
+}
 
+summary(optimism_model_1)
+mean(optimism_model_1)
 
+# 500 bootstraps for model 2
+set.seed(2004)
+BS <- 500
+optimism_model_2 <- numeric(BS)
 
+# Draw BS sample
+for (bs in 1:BS) {
+  bootstrap_values <- sample(seq_len(nrow(model_data)), size = nrow(model_data),
+                             replace = TRUE)
+  bootstrap_data <- model_data[bootstrap_values, ]
+  # Fit model 1 in BS sample
+  bootstrap_model <- glm(high_bp ~ decade_age + sex + BMXBMI + LBXGH + LBDHDD + log2_crp,
+                         data = bootstrap_data, family = binomial())
+  # Predict on bootstrap sample
+  pred_boot <- predict(bootstrap_model, newdata = bootstrap_data, type = "response")
+  # Predict on original sample
+  pred_orig <- predict(bootstrap_model, newdata = model_data, type = "response")
+  # Calculate AUROC
+  auc_boot <- as.numeric(auc(roc(bootstrap_data$high_bp, pred_boot, quiet = TRUE)))
+  auc_orig <- as.numeric(auc(roc(model_data$high_bp, pred_orig, quiet = TRUE)))
+  
+  optimism_model_2[bs] <- auc_boot - auc_orig
+}
+
+summary(optimism_model_2)
+mean(optimism_model_2)
+
+# Save important values
+apparent_auc_1 <- as.numeric(auc(roc_prediction_1))
+apparent_auc_2 <- as.numeric(auc(roc_prediction_2))
+
+corrected_auc_1 <- apparent_auc_1 - mean(optimism_model_1)
+corrected_auc_2 <- apparent_auc_2 - mean(optimism_model_2)
+
+corrected_auc_1
+corrected_auc_2
+corrected_auc_2 - corrected_auc_1
 
 
