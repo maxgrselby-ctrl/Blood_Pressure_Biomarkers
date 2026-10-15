@@ -1,0 +1,15 @@
+---
+title: "README"
+output: html_document
+date: "2026-10-11"
+---
+
+Aim: To determine whether metabolic and inflammatory biomarkers improve identification of screen-detected high blood pressure among US adults without previously reported hypertension.
+Data: NHANES 2017–2018.
+Population: Adults aged 20 years or older without previously reported hypertension and with valid blood-pressure measurements.
+Primary outcome: Screen-detected high blood pressure, defined as mean systolic blood pressure over 140 mmHg or mean diastolic blood pressure over 90 mmHg.
+Primary comparison: A baseline model containing age, sex and BMI versus a biomarker-augmented model additionally containing HbA1c, HDL cholesterol and hs-CRP.
+Machine-learning comparison: Random forest using the same predictors as the biomarker-augmented statistical model.
+Evaluation: Discrimination, calibration, classification performance and exploratory subgroup performance.
+Sensitivity analysis: Alternative blood-pressure threshold of over 130/80 mmHg for systolic and diastolic blood pressure respectively.
+Interpretation: This cross-sectional analysis evaluates identification rather than future cardiovascular risk prediction and cannot establish causal relationships.
