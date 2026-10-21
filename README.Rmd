@@ -151,9 +151,14 @@ There were several limitations with this analysis which should not be forgotten:
 **Missing data and selection.** Prediction modelling used complete-case participants. Exclusions due to unavailable laboratory or examination data may introduce selection bias and limit generalisability.
 **Limited biomarker panel.** Only HbA1c, HDL cholesterol and hs-CRP were evaluated as additional biological predictors. These do not capture the full complexity of cardiovascular disease biology.
 **Survey design and prediction.** Population prevalence and association analyses incorporated NHANES survey weights, strata and clusters. However, the prediction models and internal-validation procedures used unweighted participant-level analyses. Predictive performance therefore should not be assumed to represent the entire US adult population.
-**Internal rather than external validation.** Cross-validation and bootstrap resampling reused participants from the same NHANES survey cycle. Performance in independent cohorts, different time periods or healthcare settings remains unknown.
 
 ------------------------------------------------------------------------
+
+### Update to include external calibration of logistic models using NHANES 2015-2016 data
+
+The model was calibrated on the original 2017-2018 NHANES dataset with both AUROC and Brier scores consistent with the original calibration. The calibrated model was then applied to the 2015-2016 dataset (n = 3,072; 302 events) to compare how the model was able to predict in an external environment.
+
+Both models demonstrated good discrimination, with AUROCs of 0.781 for the baseline logistic model and 0.777 for the biomarker logistic model, alongside similar Brier scores (0.0833 and 0.0836, respectively). Calibration slopes were reasonably close to 1 (0.922 and 0.877), although negative calibration intercepts (−0.308 and −0.340) indicated  overprediction of hypertension risk. The baseline model demonstrated marginally better overall performance, with no apparent improvement from biomarker inclusion. Overall, these findings suggest reasonable temporal transportability of the models across NHANES survey cycles, although some recalibration may be beneficial to improve absolute risk predictions.
 
 ### Reproducibility
 
