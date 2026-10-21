@@ -160,6 +160,8 @@ The model was calibrated on the original 2017-2018 NHANES dataset with both AURO
 
 Both models demonstrated good discrimination, with AUROCs of 0.781 for the baseline logistic model and 0.777 for the biomarker logistic model, alongside similar Brier scores (0.0833 and 0.0836, respectively). Calibration slopes were reasonably close to 1 (0.922 and 0.877), although negative calibration intercepts (−0.308 and −0.340) indicated  overprediction of hypertension risk. The baseline model demonstrated marginally better overall performance, with no apparent improvement from biomarker inclusion. Overall, these findings suggest reasonable temporal transportability of the models across NHANES survey cycles, although some recalibration may be beneficial to improve absolute risk predictions.
 
+![Figure 5: External Calibration using NHANES 2015-2016](figures/figure6_external_calibration.png)
+
 ### Reproducibility
 
 The analysis was conducted in RStudio using the following packages: haven, dplyr, ggplot2, survey, pROC, ranger, rsample and tidyr.
